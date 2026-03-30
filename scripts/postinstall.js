@@ -17,12 +17,8 @@ const { execSync } = require('child_process');
 const PACKAGE_ROOT = path.join(__dirname, '..');
 const PROJECT_ROOT = process.env.INIT_CWD || process.cwd();
 
-// Safety: don't run if we're installing the package itself
-const isPackageItself = PROJECT_ROOT === PACKAGE_ROOT ||
-  !fs.existsSync(path.join(PROJECT_ROOT, 'package.json')) ||
-  JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf8')).name === 'pantheon-api-helper';
-
-if (isPackageItself) {
+// Skip if there's no package.json to work with
+if (!fs.existsSync(path.join(PROJECT_ROOT, 'package.json'))) {
   process.exit(0);
 }
 
