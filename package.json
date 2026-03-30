@@ -1,0 +1,32 @@
+{
+  "name": "pantheon-api-helper",
+  "version": "1.0.0",
+  "description": "Pantheon Public API context for Claude AI agents — installs pre-generated docs to .pantheonapi-docs/ and patches AGENTS.md.",
+  "main": "src/index.js",
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js",
+    "generate": "node scripts/generate.js",
+    "update": "node scripts/fetch-spec.js && node scripts/generate.js"
+  },
+  "bin": {
+    "pantheon-api-helper": "scripts/cli.js"
+  },
+  "files": [
+    "src/",
+    "scripts/",
+    "AGENTS.md"
+  ],
+  "keywords": [
+    "pantheon",
+    "api",
+    "claude",
+    "agents",
+    "llm",
+    "context"
+  ],
+  "author": "Chris Reynolds",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
