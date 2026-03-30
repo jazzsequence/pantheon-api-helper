@@ -20,30 +20,30 @@ This package is not published to npm — install directly from GitHub:
 
 **npm**
 ```bash
-npm install github:cr0wst/pantheon-api-helper
+npm install github:jazzsequence/pantheon-api-helper
 ```
 
 **yarn**
 ```bash
-yarn add github:cr0wst/pantheon-api-helper
+yarn add github:jazzsequence/pantheon-api-helper
 ```
 
 **pnpm**
 ```bash
-pnpm add github:cr0wst/pantheon-api-helper
+pnpm add github:jazzsequence/pantheon-api-helper
 ```
 
 **Pin to a specific tag or commit** (recommended for reproducibility):
 ```bash
-npm install github:cr0wst/pantheon-api-helper#v1.0.0
-npm install github:cr0wst/pantheon-api-helper#<commit-sha>
+npm install github:jazzsequence/pantheon-api-helper#v1.0.0
+npm install github:jazzsequence/pantheon-api-helper#<commit-sha>
 ```
 
 Or add it to `package.json` manually:
 ```json
 {
   "dependencies": {
-    "pantheon-api-helper": "github:cr0wst/pantheon-api-helper"
+    "pantheon-api-helper": "github:jazzsequence/pantheon-api-helper"
   }
 }
 ```
