@@ -48,7 +48,13 @@ Or add it to `package.json` manually:
 }
 ```
 
-That's it. After install you'll have:
+That's it. If the postinstall didn't run (some environments suppress lifecycle scripts, or the network was unavailable at install time), run:
+
+```bash
+npx pantheon-api-helper update
+```
+
+After install you'll have:
 
 ```
 your-project/
@@ -85,12 +91,6 @@ Re-fetch the latest spec and regenerate:
 
 ```bash
 npx pantheon-api-helper update
-```
-
-Or use the npm script if you have it wired up:
-
-```bash
-npm run pantheon-api-helper:update
 ```
 
 ## How Claude uses the docs

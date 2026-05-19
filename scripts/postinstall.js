@@ -17,8 +17,11 @@ const { execSync } = require('child_process');
 const PACKAGE_ROOT = path.join(__dirname, '..');
 const PROJECT_ROOT = process.env.INIT_CWD || process.cwd();
 
-// Skip if there's no package.json to work with
-if (!fs.existsSync(path.join(PROJECT_ROOT, 'package.json'))) {
+// Safety check: if PROJECT_ROOT resolved to the package dir itself (INIT_CWD missing
+// and process.cwd() returned node_modules/pantheon-api-helper), bail out rather than
+// patching our own AGENTS.md / .gitignore.
+if (path.resolve(PROJECT_ROOT) === path.resolve(PACKAGE_ROOT)) {
+  console.warn('[pantheon-api-helper] Could not determine project root. Run `npx pantheon-api-helper update` from your project directory.');
   process.exit(0);
 }
 
