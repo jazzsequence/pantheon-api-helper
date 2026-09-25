@@ -1,8 +1,13 @@
 # pantheon-api-helper — Claude Instructions
 
 This is the source package for `pantheon-api-helper`. It ships scripts that
-fetch the Pantheon API Swagger spec and generate structured markdown docs for
+fetch the Pantheon API OpenAPI spec and generate structured markdown docs for
 AI agents to consume.
+
+`main` targets the current **v1** API (OpenAPI 3.0). The **v0** branch is a frozen
+snapshot of the legacy Swagger 2.0 implementation for consumers still pinned to it
+(`npm install github:jazzsequence/pantheon-api-helper#v0`) — do not backport v1
+changes to it.
 
 ## Project structure
 
@@ -64,7 +69,16 @@ Then verify output in `docs/` before committing.
 
 ## Pantheon API notes
 
-- Spec: `https://api.pantheon.io/docs/swagger.json` (Swagger 2.0)
-- Auth: `POST /v0/authorize/machine-token` → Bearer token
-- Async pattern: write ops return a workflow ID; poll `GET /v0/sites/{id}/workflows/{id}`
-- 79 paths, 119 schema definitions, tags: auth / organizations / sites / users
+- Spec: `https://api.pantheon.io/v1/openapi.json` (OpenAPI 3.0.1) — the human-readable
+  docs at `https://api.pantheon.io/v1/docs` embed the same spec inline in the page's
+  SwaggerUI config, but the `openapi.json` endpoint returns it directly and needs no
+  HTML scraping
+- Auth: send `Authorization: Bearer <personal-access-token>` directly — no token
+  exchange endpoint exists in v1 (the v0 `/authorize/machine-token` flow is gone)
+- Async pattern: write ops return a workflow ID; poll `GET /sites/{id}/workflows/{id}`
+  (also scoped to `/users/{id}/workflows/{id}` and `/workspaces/{id}/workflows/{id}`)
+- 84 paths, 244 schemas, tags: Sites (65 ops) / Users (5) / Secrets (8) / Workspaces (15)
+  — `Workspaces` replaces v0's `organizations`
+- Schemas live under `components.schemas` with `$ref: '#/components/schemas/X'`
+  (not `definitions` / `#/definitions/X` like v0); request bodies are
+  `requestBody.content['application/json'].schema`, not an `in: 'body'` parameter

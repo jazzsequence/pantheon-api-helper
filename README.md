@@ -1,12 +1,14 @@
 # pantheon-api-helper
 
-Installs pre-generated [Pantheon Public API](https://api.pantheon.io/docs) documentation into any Node.js project so Claude (and other AI coding agents) have full API context at the start of every session.
+Installs pre-generated [Pantheon Public API](https://api.pantheon.io/v1/docs) documentation into any Node.js project so Claude (and other AI coding agents) have full API context at the start of every session.
 
-Inspired by the [Next.js bundled docs pattern](https://nextjs.org/blog/next-16-2-ai): on install, docs are fetched from the live Pantheon Swagger spec, converted to structured markdown, and placed in `.pantheonapi-docs/` at your project root. Your `AGENTS.md` is patched automatically to tell Claude where to look.
+Inspired by the [Next.js bundled docs pattern](https://nextjs.org/blog/next-16-2-ai): on install, docs are fetched from the live Pantheon OpenAPI spec, converted to structured markdown, and placed in `.pantheonapi-docs/` at your project root. Your `AGENTS.md` is patched automatically to tell Claude where to look.
+
+> **Targeting the legacy v0 (Swagger 2.0) API?** Install from the `v0` branch instead — see [Installation](#installation). `main` tracks the current v1 (OpenAPI 3.0) API.
 
 ## What it does
 
-1. **Fetches** the Pantheon Swagger 2.0 spec from `https://api.pantheon.io/docs/swagger.json`
+1. **Fetches** the Pantheon OpenAPI 3.0 spec from `https://api.pantheon.io/v1/openapi.json`
 2. **Generates** structured markdown docs organized into a digest hierarchy
 3. **Installs** them to `.pantheonapi-docs/` in your project root
 4. **Patches** your `AGENTS.md` with a navigation block (creating it if it doesn't exist)
@@ -35,8 +37,13 @@ pnpm add github:jazzsequence/pantheon-api-helper
 
 **Pin to a specific tag or commit** (recommended for reproducibility):
 ```bash
-npm install github:jazzsequence/pantheon-api-helper#v1.0.0
+npm install github:jazzsequence/pantheon-api-helper#v2.0.0
 npm install github:jazzsequence/pantheon-api-helper#<commit-sha>
+```
+
+**Legacy v0 (Swagger 2.0) API** — install from the `v0` branch:
+```bash
+npm install github:jazzsequence/pantheon-api-helper#v0
 ```
 
 Or add it to `package.json` manually:
@@ -60,28 +67,32 @@ After install you'll have:
 your-project/
 ├── .pantheonapi-docs/
 │   ├── digest.md                  ← start here
-│   ├── auth/
-│   │   └── endpoints.md
-│   ├── organizations/
-│   │   └── endpoints.md
 │   ├── sites/
 │   │   ├── digest.md              ← sites sub-index
 │   │   ├── sites-base.md
 │   │   ├── environments.md
-│   │   ├── backups.md
-│   │   ├── domains.md
+│   │   ├── builds.md
+│   │   ├── multidevs.md
 │   │   ├── code.md
-│   │   ├── cache.md
+│   │   ├── backups.md
+│   │   ├── exports.md
+│   │   ├── imports.md
 │   │   ├── database-files.md
-│   │   ├── addons.md
-│   │   ├── workflows.md
+│   │   ├── runtime-logs.md
+│   │   ├── domains.md
+│   │   ├── cache.md
 │   │   ├── memberships.md
-│   │   ├── env-variables.md
-│   │   └── metrics.md
+│   │   ├── workflows.md
+│   │   ├── addons.md
+│   │   └── migration.md
+│   ├── workspaces/
+│   │   └── endpoints.md
+│   ├── secrets/
+│   │   └── endpoints.md
 │   ├── users/
 │   │   └── endpoints.md
 │   └── schemas/
-│       └── index.md               ← all 119 schemas
+│       └── index.md               ← all 244 schemas
 └── AGENTS.md                      ← patched with navigation block
 ```
 
@@ -110,7 +121,7 @@ Pre-generated Pantheon API docs are installed in `.pantheonapi-docs/`.
 
 Claude reads `AGENTS.md` at the start of every session. When you ask it to do anything with the Pantheon API, it navigates to the relevant section file rather than guessing from training data.
 
-The sites section (66 endpoints) is split into sub-sections to keep context loads small — Claude reads the sites digest first, then loads only the sub-section it needs.
+The sites section (65 endpoints) is split into sub-sections to keep context loads small — Claude reads the sites digest first, then loads only the sub-section it needs.
 
 ## Doc structure
 
@@ -122,46 +133,42 @@ Overview of all sections, endpoint counts, key auth and async patterns. Always s
 
 | Section | Endpoints | Notes |
 |---------|-----------|-------|
-| `auth/endpoints.md` | 1 | Machine token exchange |
-| `organizations/endpoints.md` | 12 | Org memberships, sites, users, upstreams |
-| `sites/digest.md` | 66 | Sub-indexed — see below |
-| `users/endpoints.md` | 10 | SSH keys, machine tokens, memberships |
+| `sites/digest.md` | 65 | Sub-indexed — see below |
+| `workspaces/endpoints.md` | 15 | Workspace CRUD, memberships, upstreams, logo — replaces v0's `organizations` |
+| `secrets/endpoints.md` | 8 | Customer secrets, per-environment overrides |
+| `users/endpoints.md` | 5 | Current user, SSH keys, upstreams, workflows |
 
 ### Sites sub-sections
 
 | File | Endpoints |
 |------|-----------|
-| `sites/sites-base.md` | Site CRUD, plan, owner, upstream, payment method |
-| `sites/environments.md` | Deploy, wipe, connection mode, lock, PHP version |
+| `sites/sites-base.md` | Site CRUD, environment list/create, deploy, unfreeze |
+| `sites/environments.md` | Lock, status checks, rollback, wipe, deployments, dev-mode, merges |
+| `sites/builds.md` | Build status and logs |
+| `sites/multidevs.md` | Multidev create/delete/validate |
+| `sites/code.md` | Commits, code sync, upstream updates, git branches, code cache |
 | `sites/backups.md` | Create, catalog, schedule, restore, download URL |
-| `sites/domains.md` | Add, remove, primary, DNS recommendations |
-| `sites/code.md` | Commits, diffstat, rebuild, upstream updates |
-| `sites/cache.md` | Clear environment and upstream cache |
-| `sites/database-files.md` | Clone, import database and files |
-| `sites/addons.md` | Redis and Solr enable/disable |
-| `sites/workflows.md` | Workflow status, logs |
-| `sites/memberships.md` | Team and org membership management |
-| `sites/env-variables.md` | Environment variables |
-| `sites/metrics.md` | Site metrics and timeseries |
+| `sites/exports.md` | Environment exports and download URLs |
+| `sites/imports.md` | Database/file imports by file or URL |
+| `sites/database-files.md` | Clone database and files between environments |
+| `sites/runtime-logs.md` | Environment and tenant runtime logs |
+| `sites/domains.md` | Add, remove, primary domain, ownership verification |
+| `sites/cache.md` | Clear environment cache |
+| `sites/memberships.md` | Site team membership, promote to owner, leave |
+| `sites/workflows.md` | Workflow status, site-status |
+| `sites/addons.md` | Addon enable/disable |
+| `sites/migration.md` | Migration completion |
 
 ### Schemas — `.pantheonapi-docs/schemas/index.md`
 
-All 119 request/response type definitions from the spec.
+All 244 request/response type definitions from the spec.
 
 ## Key API patterns
 
-**Authentication**
+**Authorization header** — no token exchange step; send your personal access token (or access token) directly:
 
 ```
-POST /v0/authorize/machine-token
-Body: { machine_token, client }
-→ Returns: session token (use as Bearer token)
-```
-
-**Authorization header**
-
-```
-Authorization: Bearer <session-token>
+Authorization: Bearer <token>
 ```
 
 **Async operations**
@@ -169,7 +176,9 @@ Authorization: Bearer <session-token>
 Most write operations (deploy, backup, clone, etc.) return a workflow ID immediately. Poll for completion:
 
 ```
-GET /v0/sites/{site_id}/workflows/{workflow_id}
+GET /sites/{site_id}/workflows/{workflow_id}
+GET /users/{user_id}/workflows/{workflow_id}
+GET /workspaces/{workspace_id}/workflows/{workflow_id}
 → { result: "succeeded" | "failed" | "running", step, active_description }
 ```
 
@@ -177,7 +186,7 @@ GET /v0/sites/{site_id}/workflows/{workflow_id}
 
 | Script | What it does |
 |--------|-------------|
-| `scripts/fetch-spec.js` | Downloads `swagger.json` → `.cache/swagger.json` |
+| `scripts/fetch-spec.js` | Downloads `openapi.json` → `.cache/openapi.json` |
 | `scripts/generate.js` | Converts cached spec → `docs/` markdown |
 | `scripts/postinstall.js` | Fetch + generate + copy to `.pantheonapi-docs/` + patch AGENTS.md + .gitignore |
 | `scripts/cli.js` | `npx pantheon-api-helper <update\|generate\|fetch>` |
@@ -195,7 +204,7 @@ console.log(rootDigest());
 
 // A specific section
 console.log(section('sites/backups'));
-console.log(section('auth/endpoints'));
+console.log(section('workspaces/endpoints'));
 console.log(section('schemas/index'));
 ```
 

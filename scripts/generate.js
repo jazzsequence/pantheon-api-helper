@@ -1,29 +1,34 @@
 #!/usr/bin/env node
-// Converts the cached Pantheon Swagger spec into structured markdown docs under docs/
+// Converts the cached Pantheon OpenAPI 3.0 (v1) spec into structured markdown docs under docs/
 // Run via: node scripts/generate.js  or  npm run generate
-// Requires: node scripts/fetch-spec.js to have run first (or .cache/swagger.json to exist)
+// Requires: node scripts/fetch-spec.js to have run first (or .cache/openapi.json to exist)
 
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
 
-const CACHE_FILE = path.join(__dirname, '..', '.cache', 'swagger.json');
+const CACHE_FILE = path.join(__dirname, '..', '.cache', 'openapi.json');
 const DOCS_DIR = path.join(__dirname, '..', 'docs');
+const REF_PREFIX = '#/components/schemas/';
 
-// Sites sub-group routing: match on path segment keywords
+// Sites sub-group routing: match on path segment keywords. Order matters — first match wins.
 const SITES_GROUPS = [
-  { name: 'environments',    file: 'environments.md',    match: /\/environments\/[^/]+\/(deploy|wipe|connection-mode|lock|settings|phpversion)/ },
-  { name: 'backups',         file: 'backups.md',          match: /\/backups/ },
-  { name: 'domains',         file: 'domains.md',          match: /\/domains/ },
-  { name: 'code',            file: 'code.md',             match: /\/(commits|diffstat|rebuild|upstream-updates|code)/ },
-  { name: 'cache',           file: 'cache.md',            match: /\/clear-cache|\/cache/ },
-  { name: 'database-files',  file: 'database-files.md',  match: /\/(database|files|clone-files|clone-database|import)/ },
-  { name: 'addons',          file: 'addons.md',           match: /\/(redis|solr|addons)/ },
-  { name: 'workflows',       file: 'workflows.md',        match: /\/workflows/ },
-  { name: 'memberships',     file: 'memberships.md',      match: /\/(memberships|user-memberships|org-memberships)/ },
-  { name: 'env-variables',   file: 'env-variables.md',   match: /\/(variables|envvars|environment-variables)/ },
-  { name: 'metrics',         file: 'metrics.md',          match: /\/metrics/ },
+  { name: 'builds',         file: 'builds.md',         match: /\/builds/ },
+  { name: 'multidevs',      file: 'multidevs.md',      match: /\/multidevs?(-names)?/ },
+  { name: 'code',           file: 'code.md',            match: /\/(git-branches|commits|code\/sync|code-cache|upstream-updates)/ },
+  { name: 'backups',        file: 'backups.md',        match: /\/backup/ },
+  { name: 'exports',        file: 'exports.md',        match: /\/export/ },
+  { name: 'imports',        file: 'imports.md',        match: /\/import/ },
+  { name: 'database-files', file: 'database-files.md', match: /\/(database|files)\/clone/ },
+  { name: 'runtime-logs',   file: 'runtime-logs.md',   match: /runtime-log/ },
+  { name: 'domains',        file: 'domains.md',        match: /domain/ },
+  { name: 'cache',          file: 'cache.md',           match: /\/cache\/clear/ },
+  { name: 'memberships',    file: 'memberships.md',    match: /\/(users|membership|promote-to-owner|leave)/ },
+  { name: 'workflows',      file: 'workflows.md',       match: /\/workflows/ },
+  { name: 'addons',         file: 'addons.md',          match: /\/addons/ },
+  { name: 'migration',      file: 'migration.md',       match: /\/migration/ },
+  { name: 'environments',   file: 'environments.md',    match: /\/environments\/[^/]+\/(lock|status-checks|rollback|wipe|deployments|development-mode|merges)/ },
 ];
 
 function slugify(tag) {
@@ -36,10 +41,10 @@ function httpMethod(method) {
 
 function schemaRef(ref) {
   if (!ref) return '';
-  return ref.replace('#/definitions/', '');
+  return ref.replace(REF_PREFIX, '');
 }
 
-function resolveSchema(schema, definitions) {
+function resolveSchema(schema) {
   if (!schema) return 'N/A';
   if (schema.$ref) return schemaRef(schema.$ref);
   if (schema.type === 'array' && schema.items) {
@@ -49,57 +54,57 @@ function resolveSchema(schema, definitions) {
   return schema.type || 'object';
 }
 
-function renderParams(params = [], definitions) {
+function renderParams(params = []) {
   const pathParams = params.filter(p => p.in === 'path');
   const queryParams = params.filter(p => p.in === 'query');
-  const bodyParams = params.filter(p => p.in === 'body');
 
   const lines = [];
 
   if (pathParams.length) {
     lines.push('**Path params:** ' + pathParams.map(p =>
-      `\`${p.name}\`${p.required ? '' : '?'} (${p.type || 'string'})`
+      `\`${p.name}\`${p.required ? '' : '?'} (${resolveSchema(p.schema)})`
     ).join(', '));
   }
 
   if (queryParams.length) {
     lines.push('**Query params:** ' + queryParams.map(p =>
-      `\`${p.name}\`${p.required ? '' : '?'} (${p.type || 'string'})`
+      `\`${p.name}\`${p.required ? '' : '?'} (${resolveSchema(p.schema)})`
     ).join(', '));
   }
 
-  if (bodyParams.length) {
-    const body = bodyParams[0];
-    const schemaName = body.schema ? resolveSchema(body.schema, definitions) : 'N/A';
-    lines.push(`**Body:** \`${schemaName}\``);
-  }
-
-  return lines.join('  \n') || 'None';
+  return lines;
 }
 
-function renderResponse(responses = {}, definitions, specResponses = {}) {
-  let success = responses['200'] || responses['201'] || responses['202'];
+function renderRequestBody(requestBody) {
+  const mediaType = ((requestBody || {}).content || {})['application/json'];
+  const schema = mediaType && mediaType.schema;
+  if (!schema) return null;
+  return `**Body:** \`${resolveSchema(schema)}\``;
+}
+
+function renderResponse(responses = {}) {
+  const success = responses['200'] || responses['201'] || responses['202'];
   if (!success) return 'N/A';
 
-  // Dereference top-level $ref (e.g. { "$ref": "#/responses/SessionResponse" })
-  if (success.$ref) {
-    const refName = success.$ref.replace('#/responses/', '');
-    success = specResponses[refName] || success;
-  }
-
-  if (!success.schema) return success.description || 'N/A';
-  return resolveSchema(success.schema, definitions);
+  const schema = ((success.content || {})['application/json'] || {}).schema;
+  if (!schema) return success.description || 'N/A';
+  return resolveSchema(schema);
 }
 
-function renderEndpoint(method, pathStr, op, definitions, specResponses) {
+function renderEndpoint(method, pathStr, op) {
   const lines = [];
   lines.push(`### \`${httpMethod(method).trim()} ${pathStr}\``);
   if (op.summary) lines.push(`**${op.summary}**`);
   if (op.description && op.description !== op.summary) lines.push(`\n${op.description}`);
   lines.push('');
-  lines.push(renderParams(op.parameters, definitions));
+
+  const paramLines = renderParams(op.parameters);
+  const bodyLine = renderRequestBody(op.requestBody);
+  if (bodyLine) paramLines.push(bodyLine);
+  lines.push(paramLines.join('  \n') || 'None');
+
   lines.push('');
-  lines.push(`**Returns:** ${renderResponse(op.responses, definitions, specResponses)}`);
+  lines.push(`**Returns:** ${renderResponse(op.responses)}`);
   lines.push('');
   return lines.join('\n');
 }
@@ -162,12 +167,13 @@ function generateTimestamp() {
 
 function main() {
   if (!fs.existsSync(CACHE_FILE)) {
-    console.error(`Spec not found at spec/swagger.json or .cache/swagger.json. Run: node scripts/fetch-spec.js`);
+    console.error(`Spec not found at .cache/openapi.json. Run: node scripts/fetch-spec.js`);
     process.exit(1);
   }
 
   const spec = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-  const { paths = {}, definitions = {}, responses: specResponses = {}, info = {} } = spec;
+  const { paths = {}, components = {}, info = {} } = spec;
+  const definitions = components.schemas || {};
   const generated = generateTimestamp();
 
   // Clean docs dir
@@ -197,14 +203,15 @@ function main() {
     const tagDir = path.join(DOCS_DIR, slug);
     fs.mkdirSync(tagDir, { recursive: true });
 
-    if (tag === 'sites') {
+    if (slug === 'sites') {
       // Split sites into sub-groups
       const subGroups = groupSitesPaths(tagPaths);
+      const totalCount = Object.values(tagPaths).reduce((n, m) => n + Object.keys(m).length, 0);
       const subDigestLines = [
         `# Sites API — Sub-Index`,
-        `_Generated: ${generated} from Pantheon API v${info.version}_`,
+        `_Generated: ${generated} from Pantheon API v1 (spec ${info.version})_`,
         '',
-        'The Sites tag contains 66 endpoints, organized below by domain:',
+        `The Sites tag contains ${totalCount} endpoints, organized below by domain:`,
         '',
         '| Section | File | Description |',
         '|---------|------|-------------|',
@@ -215,13 +222,13 @@ function main() {
         const groupFile = path.join(tagDir, group.file);
         const lines = [
           `# Sites — ${group.name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`,
-          `_Generated: ${generated} from Pantheon API v${info.version}_`,
+          `_Generated: ${generated} from Pantheon API v1 (spec ${info.version})_`,
           '',
         ];
 
         for (const [p, methods] of group.endpoints) {
           for (const [method, op] of Object.entries(methods)) {
-            lines.push(renderEndpoint(method, p, op, definitions, specResponses));
+            lines.push(renderEndpoint(method, p, op));
             lines.push('---');
           }
         }
@@ -237,7 +244,7 @@ function main() {
       tagSummaries.push({
         tag,
         slug,
-        count: Object.values(tagPaths).reduce((n, m) => n + Object.keys(m).length, 0),
+        count: totalCount,
         digest: `.pantheonapi-docs/sites/digest.md`,
         note: 'Split into sub-sections — see sites/digest.md',
       });
@@ -245,14 +252,14 @@ function main() {
     } else {
       // Single file for small tags
       const lines = [
-        `# ${tag.charAt(0).toUpperCase() + tag.slice(1)} API`,
-        `_Generated: ${generated} from Pantheon API v${info.version}_`,
+        `# ${tag} API`,
+        `_Generated: ${generated} from Pantheon API v1 (spec ${info.version})_`,
         '',
       ];
 
       for (const [p, methods] of Object.entries(tagPaths)) {
         for (const [method, op] of Object.entries(methods)) {
-          lines.push(renderEndpoint(method, p, op, definitions, specResponses));
+          lines.push(renderEndpoint(method, p, op));
           lines.push('---');
         }
       }
@@ -271,9 +278,9 @@ function main() {
 
   const schemaLines = [
     `# Pantheon API — Schema Definitions`,
-    `_Generated: ${generated} from Pantheon API v${info.version}_`,
+    `_Generated: ${generated} from Pantheon API v1 (spec ${info.version})_`,
     '',
-    `${Object.keys(definitions).length} definitions`,
+    `${Object.keys(definitions).length} schemas`,
     '',
   ];
 
@@ -287,8 +294,8 @@ function main() {
   // Generate root digest
   const digestLines = [
     `# Pantheon API — Root Digest`,
-    `_Generated: ${generated} from Pantheon API v${info.version}_`,
-    `_Spec: ${spec.host} | Auth: \`Authorization: Bearer <machine-token>\`_`,
+    `_Generated: ${generated} from Pantheon API v1 (spec ${info.version})_`,
+    `_Base URL: https://api.pantheon.io/v1 | Auth: \`Authorization: Bearer <personal-access-token>\`_`,
     '',
     '## Navigation',
     '',
@@ -312,8 +319,8 @@ function main() {
   digestLines.push('');
   digestLines.push('## Key Patterns');
   digestLines.push('');
-  digestLines.push('- **Auth:** `POST /v0/authorize/machine-token` → returns session token');
-  digestLines.push('- **Async ops:** Most write operations return a workflow ID. Poll `GET /v0/sites/{site_id}/workflows/{workflow_id}` for status.');
+  digestLines.push('- **Auth:** Send `Authorization: Bearer <token>` (a Pantheon personal access token or access token) on every request — there is no token-exchange step.');
+  digestLines.push('- **Async ops:** Most write operations return a workflow ID. Poll `GET /sites/{site_id}/workflows/{workflow_id}` (also available scoped to `/users/{user_id}/workflows/{workflow_id}` and `/workspaces/{workspace_id}/workflows/{workflow_id}`) for status.');
   digestLines.push('- **Workflow result:** `{ result: "succeeded"|"failed"|"running", step, active_description }`');
   digestLines.push('');
 
