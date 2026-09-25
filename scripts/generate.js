@@ -62,13 +62,13 @@ function renderParams(params = []) {
 
   if (pathParams.length) {
     lines.push('**Path params:** ' + pathParams.map(p =>
-      `\`${p.name}\`${p.required ? '' : '?'} (${(p.schema || {}).type || 'string'})`
+      `\`${p.name}\`${p.required ? '' : '?'} (${resolveSchema(p.schema)})`
     ).join(', '));
   }
 
   if (queryParams.length) {
     lines.push('**Query params:** ' + queryParams.map(p =>
-      `\`${p.name}\`${p.required ? '' : '?'} (${(p.schema || {}).type || 'string'})`
+      `\`${p.name}\`${p.required ? '' : '?'} (${resolveSchema(p.schema)})`
     ).join(', '));
   }
 
